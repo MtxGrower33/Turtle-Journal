@@ -26,6 +26,8 @@ function TJ.CreateFrames()
     bgTexture:SetAllPoints(mainFrame)
     -- bgTexture:SetVertexColor(0.8, 0.8, 0.8, 0.4) -- will keep this for later
 
+    tinsert(UISpecialFrames, mainFrame:GetName())
+
     -- title editbox
     local titleBox = CreateFrame("EditBox", "TurtleJournalTitleBox", mainFrame)
     titleBox:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 100, -100)

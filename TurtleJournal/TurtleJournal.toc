@@ -4,7 +4,7 @@
 ## Version: 1.0
 ## Author: Guzruul
 ## X-Name: TurtleJournal
-### X-url: https://forum.turtle-wow.org/viewtopic.php?t=18681
+### X-url: https://forum.turtle-wow.org/viewtopic.php?t=18820
 ## SavedVariablesPerCharacter: TurtleJournal_DB, TurtleJournal_Settings
 
 init.lua

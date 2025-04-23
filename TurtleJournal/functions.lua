@@ -167,9 +167,8 @@ function TJ.SetupMainFrameOpener()
     local oldHandler = PlayerFrame:GetScript("OnMouseUp")
 
     PlayerFrame:SetScript("OnMouseUp", function()
-        -- Check if shift is held and right mouse button was clicked
+        -- check if shift is held and right mouse button was clicked
         if IsShiftKeyDown() and arg1 == "LeftButton" then
-            -- Toggle main frame visibility
             if TJ.frames.main:IsVisible() then
                 TJ.frames.main:Hide()
                 TJ.debug("TurtleJournal closed")
@@ -182,7 +181,7 @@ function TJ.SetupMainFrameOpener()
                 TJ.DoEmote("SIT")
             end
         elseif oldHandler then
-            -- Call original handler if it exists
+            -- call original handler if it exists
             oldHandler(this, arg1)
         end
     end)
