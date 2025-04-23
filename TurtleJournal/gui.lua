@@ -436,7 +436,7 @@ function TJ.UpdateEntryList()
         offset = offset + buttonHeight + 2
     end
 
-    TJ.frames.entryListContent:SetHeight(math.max(380, offset))
+    TJ.frames.entryListContent:SetHeight(math.max(1580, offset))
 end
 
 function TJ.DisplayEntry(dateStr, entryId)
