@@ -1,0 +1,15 @@
+## Interface: 11200
+## Title: |cffff6060Turtle-Journal|r|cffffffff - ALPHA
+## Notes: A simple journal addon for Turtle WoW.
+## Version: 1.0
+## Author: Guzruul
+## X-Name: TurtleJournal
+### X-url: https://forum.turtle-wow.org/viewtopic.php?t=18681
+## SavedVariablesPerCharacter: TurtleJournal_DB, TurtleJournal_Settings
+
+init.lua
+# profiles.lua -- unused at the moment
+functions.lua
+gui.lua
+
+test.lua
