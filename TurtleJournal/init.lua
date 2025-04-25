@@ -1,172 +1,161 @@
--- --==================================================
--- TurtleJournal
+---@diagnostic disable: deprecated
 --==================================================
+-- VARIABLES
+--==================================================
+local tj = TurtleJournal
+local d = tj.dt
+local ADDON_NAME = "Turtlejournal"
 
--- setup namespace
-local ADDON_NAME = "TurtleJournal"
+-- debug
+d:debug("booting...")
 
-TurtleJournal = CreateFrame("Frame", ADDON_NAME, UIParent)
-TurtleJournal:RegisterEvent("VARIABLES_LOADED")
-
-local TJ = TurtleJournal
-TJ.addonInfo = {
+--==================================================
+-- ADDON METADATA
+--==================================================
+tj.addonInfo = {
     name    = GetAddOnMetadata(ADDON_NAME, "X-name")   or "TurtleJournal",
     version = GetAddOnMetadata(ADDON_NAME, "Version")  or "Unknown",
     url     = GetAddOnMetadata(ADDON_NAME, "X-url")    or "Turtle Forum > Addons",
 }
 
--- debug functions
-local debug = false
-
-function TJ.print(msg)
-    if type(msg) == "table" then
-        local t = {}
-        for k, v in pairs(msg) do
-            if type(v) == "table" then
-                table.insert(t, k .. "={title=" .. tostring(v.title) .. ", content=" .. tostring(v.content) .. "}")
-            else
-                table.insert(t, k .. "=" .. tostring(v))
-            end
-        end
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff6060Journal|r: " .. table.concat(t, "\n"))
-    else
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff6060Journal|r: " .. (msg or "nil"))
-    end
-end
-
-TJ.debugCount = 0
-function TJ.debug(msg)
-    if debug then
-        TJ.debugCount = TJ.debugCount + 1
-        local stack = debugstack(2, 1, 0)
-        local start, finish = string.find(stack, "[^\\/:]+%.lua")
-        local file = start and string.sub(stack, start, finish) or "unknown"
-        TJ.print("[DEBUG][ " .. TJ.debugCount .. " ][|cff00ff00" .. file .. "|r]: " .. (msg or "nil"))
-        -- TJ.print(debugstack(2, 3, 0)) -- can be enabled if needed
-    end
-end
-
-function TJ.drawred(frame)
-    if not frame or not frame.CreateTexture then return end
-
-    if not debug then
-        if frame.border then
-            frame.border:Hide()
-        end
-        return
-    end
-
-    if frame.border then
-        frame.border:Show()
-        return
-    end
-
-    local border = CreateFrame("Frame", nil, frame)
-    border:SetFrameLevel(frame:GetFrameLevel() + 1)
-    border:SetAllPoints()
-
-    border.tex = border:CreateTexture(nil, "OVERLAY")
-    border.tex:SetTexture("Interface\\Buttons\\WHITE8x8")
-    border.tex:SetVertexColor(1, 0, 0, 1)
-
-    border:SetBackdrop({
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-
-    border:SetBackdropBorderColor(1, 0, 0, 1)
-
-    frame.border = border
-end
-
--- boot
-TJ.debug("booting...")
-
--- saved variables
+--==================================================
+-- TABLES
+--==================================================
 TurtleJournal_Settings = {}
 TurtleJournal_DB = {
     ["1991-03-03"] = {
         ["1"] = {
             ["title"] = "Hey there turtle...",
-            ["content"] = "Thank you for using Turtle-Journal.\n\nTo get started:\n- Use Shift + Leftclick on your player portrait or use /tj in order to open the journal.\n- Use Shift + Mousewheel to resize the journal window.\n- Use Ctrl + Mousewheel to adjust transparency of the journal window.\n\nRemeber to backup your files in\nyour WTF/Server/Char/SavedVariables folder.\nAddon's can not back up your files.\n\nThis is an alpha version, report bugs please.\n\nTake care turtles...\n            ...Guzruul.",
+            ["content"] = "Thank you for using Turtle-Journal.\n\nTo unfurl your scroll of memories:\n-Shift+Click your player portrait\n or whisper /tj to call\n forth the journal.\n\n-Shift+Mousewheel to resize\n the journal window.\n\n-Ctrl+Mousewheel to adjust\n transparency of the journal window.\n\nGuard your lore well! Tread to:\n WTF/Server/<Realm>/<Character>/SavedVariables\n and copy the Turtle-Journal file\n ere disaster strikes\n—\nadd-ons heed not your backups.\n\nThis is but an Alpha edition\n of the journal.\n\n Should you discover any rips\n in the parchment (bugs),\n send word to your\n fellow turtles.\n\nTake care turtles...\n            ...Guzruul.",
         }
     },
 }
+tj.modules = {}
+tj.env = {}
 
--- event handler
-TJ:SetScript("OnEvent", function()
+--==================================================
+-- ERROR HANDLING -- needs inspect
+--==================================================
+tj.errorHandler = {
+    errors = {},
+    maxErrors = 50
+}
+
+function tj.errorHandler:Handle(err, source)
+    DEFAULT_CHAT_FRAME:AddMessage(d.colors.red .."ERROR|r: ".. err.. "\n".. d.colors.red.. "SOURCE|r: [ ".. d.colors.red.. source.. d.colors.red .. "|r ]")  -- Basic print for testing
+
+    -- format error msg
+    local timestamp = date("%H:%M:%S")
+    local errorMsg = string.format("%s: %s from %s", timestamp, tostring(err), tostring(source))
+
+    -- store error
+    table.insert(self.errors, errorMsg)
+
+    -- max errors
+    if table.getn(self.errors) > self.maxErrors then
+        table.remove(self.errors, 1)
+    end
+
+    -- print error
+    d:debug("Error: " .. d.colors.red .. errorMsg)
+
+    -- stack trace
+    -- d:debug(d.colors.red .. debugstack(2) .. "|r")
+end
+
+--==================================================
+-- MODULE SYSTEM
+--==================================================
+function tj:RegisterModule(moduleName, moduleFunc)
+    -- duplicate check
+    if self.modules[moduleName] then
+        d:debug("WARNING: Module: [ ".. d.colors.red .. moduleName .. "|r ] already registered")
+        return end
+
+    self.modules[moduleName] = moduleFunc
+    d:debug("Module: [ ".. d.colors.red .. moduleName .. "|r ] registered")
+end
+
+function tj:GetEnvironment()
+    local _G = getfenv(0)
+    setmetatable(tj.env, {__index = _G})
+
+    tj.env._G = getfenv(0)
+    return tj.env
+end
+
+function tj:LoadModule(moduleName)
+    if not self.modules[moduleName] then
+        self.errorHandler:Handle("Module not found: " .. moduleName, "LoadModule")
+        return false
+    end
+
+    local success, error = pcall(function()
+        setfenv(self.modules[moduleName], self:GetEnvironment())
+        d:debug("Module: [ ".. d.colors.red .. moduleName .. "|r ]" .. d.colors.red .. " booting...")
+        self.modules[moduleName]()
+        d:debug("Module: [ ".. d.colors.red .. moduleName .. "|r ]" .. d.colors.green .. " loaded...")
+    end)
+
+    if not success then
+        self.errorHandler:Handle(error, "Module: " .. moduleName)
+        return false
+    end
+    return true
+end
+
+--==================================================
+-- EVENT HANDLING
+--==================================================
+tj:RegisterEvent("VARIABLES_LOADED")
+tj:SetScript("OnEvent", function()
     if event == "VARIABLES_LOADED" then
-        TJ.debug("'VARIABLES_LOADED' event triggered.")
+        d:debug("VARIABLES_LOADED")
 
-        TJ.InitializeSettings()
-        TJ.CreateFrames()
-        TJ.UpdateEntryList()
-        TJ.SetupMainFrameOpener()
-        -----------------------------------------
-        -- will be gone after alpha v1.0
-        TJ.drawred(TJ.frames.main)
-        TJ.drawred(TJ.frames.entryList)
-        TJ.drawred(TJ.frames.optionsPanel)
-        TJ.drawred(TJ.frames.titleBox)
-        TJ.drawred(TJ.frames.editBox)
-        TJ.drawred(TJ.frames.savebtn)
-        TJ.drawred(TJ.frames.saveDBbtn)
-        TJ.drawred(TJ.frames.deletebtn)
-        TJ.drawred(TJ.frames.optionsbtn)
-        TJ.drawred(TJ.frames.slideButton)
+        tj:LoadModule("functions")
+        tj:LoadModule("gui")
+        tj.UpdateEntryList()
 
-        local debugbtn = CreateFrame("Button", "debugbtn", TJ.frames.optionsPanel, "UIPanelButtonTemplate")
-        debugbtn:SetPoint("LEFT", TJ.frames.sitCheckbox, "RIGHT", 60, 0)
-        debugbtn:SetHeight(15)
-        debugbtn:SetWidth(50)
-        debugbtn:SetText("debug")
-        debugbtn:SetFrameStrata("DIALOG")
+        d:print("TurtleJournal".. d.colors.green .. " loaded.")
+        d:print("Type /".. d.colors.green .."tj|r or "..d.colors.green.."shift|r + ".. d.colors.green.."click|r your portrait.")
 
-        debugbtn:SetScript("OnEnter", function()
-            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Will be removed after alpha phase.")
-            GameTooltip:Show()
-        end)
-        debugbtn:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-
-        debugbtn:SetScript("OnClick", function()
-            debug = not debug
-            TJ.debug("debug: " .. tostring(debug))
-
-            TJ.drawred(TJ.frames.main)
-            TJ.drawred(TJ.frames.entryList)
-            TJ.drawred(TJ.frames.optionsPanel)
-            TJ.drawred(TJ.frames.titleBox)
-            TJ.drawred(TJ.frames.editBox)
-            TJ.drawred(TJ.frames.savebtn)
-            TJ.drawred(TJ.frames.saveDBbtn)
-            TJ.drawred(TJ.frames.deletebtn)
-            TJ.drawred(TJ.frames.optionsbtn)
-            TJ.drawred(TJ.frames.slideButton)
-        end)
-
-        -----------------------------------------
-
-        TJ.debug("TurtleJournal initialized.")
-        TJ:UnregisterEvent("VARIABLES_LOADED")
+        tj:UnregisterEvent("VARIABLES_LOADED")
     end
 end)
 
--- slash command
+--==================================================
+-- SLASH
+--==================================================
 SLASH_TURTLEJOURNAL1 = "/tj"
 SLASH_TURTLEJOURNAL2 = "/turtlejournal"
 function SlashCmdList.TURTLEJOURNAL()
-    if TJ.frames.main:IsVisible() then
-        TJ.frames.main:Hide()
-        TJ.debug("TurtleJournal closed")
-        TJ.DoEmote("STAND")
-        TJ.SwooshSound()
+    if tj.frames.main:IsVisible() then
+        tj.frames.main:Hide()
+        tj.frames.bottomOptionFrame2:Hide()
+        d:debug("TurtleJournal closed")
+        tj.DoEmote("STAND")
+        tj.SwooshSound()
     else
-        TJ.frames.main:Show()
-        TJ.SwooshSound()
-        TJ.debug("TurtleJournal opened")
-        TJ.DoEmote("SIT")
+        tj.frames.main:Show()
+        if TurtleJournal_Settings.autoOpen then
+            tj.frames.sideEntryList:Show()
+            tj.frames.miniScrollPanel:Show()
+        end
+        tj.SwooshSound()
+        d:debug("TurtleJournal opened")
+        tj.DoEmote("SIT")
+    end
+end
+
+SLASH_TJERRORS1 = "/tjerrors"
+SlashCmdList["TJERRORS"] = function()
+    if table.getn(tj.errorHandler.errors) == 0 then
+        d:debug(d.colors.green .. "No errors recorded" .. "|r")
+        return
+    end
+
+    d:debug("Last " .. table.getn(tj.errorHandler.errors) .. " errors:" .. "|r")
+    for i = 1, table.getn(tj.errorHandler.errors) do
+        d:debug(d.colors.red .. tj.errorHandler.errors[i] .. "|r")
     end
 end

@@ -1,381 +1,539 @@
 ---@diagnostic disable: deprecated
 --==================================================
--- functions
+-- FUNCTIONS
 --==================================================
--- todo : content lenght set at 2 points + checkbox lenght = bad. very bad.
--- ENTRYLIST MUST GET SORTED BY INDEX
--- backup reminder for the user
--- draw feature, change textures, custom journal title, other tools and perks
--- fonts, alpha, soundeffect, etc.
--- scrollframe instead of fixed editbox
+local tj = TurtleJournal
+local d = tj.dt
+d:debug("booting...")
 
-local TJ = TurtleJournal
-TJ.debug("booting...")
+tj:RegisterModule("functions", function()
 
--- defaults
-local defaults = {
-    sound = true,
-    scale = 1.0,
-    alpha = 1.0,
-    sit = true,
-}
-
-TJ.typing = {
-    lastSoundTime = 0,
-    soundInterval = 7,
-    soundFiles = {
-        "Interface\\AddOns\\TurtleJournal\\media\\writing-on-notebook-dan-barracuda-1-00-25.mp3",
-        "Interface\\AddOns\\TurtleJournal\\media\\writing-on-notebook-dan-barracuda-1-00-25-2.mp3",
-        "Interface\\AddOns\\TurtleJournal\\media\\writing-on-notebook-dan-barracuda-1-00-25-3.mp3"
-    },
-    soundFiles2 = {
-        "Interface\\AddOns\\TurtleJournal\\media\\swoosh-sound-effect-for-fight-scenes-or-transitions-2-149890.mp3",
-        "Interface\\AddOns\\TurtleJournal\\media\\swoosh-sound-effect-for-fight-scenes-or-transitions-4-149887.mp3",
+    local defaults = {
+        sound = true,
+        autoOpen = false,
+        darkMode = false,
+        time = true,
+        customName = "Turtle Journal",
+        focus = true,
+        limit = true,
+        sit = true,
+        scale = 1,
+        alpha = 1.0,
     }
-}
 
--- defaults init
-function TJ.InitializeSettings()
-    if not TurtleJournal_Settings then
-        TurtleJournal_Settings = {}
-        TJ.debug("ATTENTION: Created new database")
-    end
+    local typing = {
+        lastSoundTime = 0,
+        soundInterval = 5,
+    }
 
-    for setting, defaultValue in pairs(defaults) do
-        if TurtleJournal_Settings[setting] == nil then
-            TurtleJournal_Settings[setting] = defaultValue
-            TJ.debug("Created new setting: " .. setting)
+    -- defaults init
+    function tj:InitializeSettings()
+        if not TurtleJournal_Settings then
+            TurtleJournal_Settings = {}
+            d:debug("ATTENTION: Created new database")
+        end
+
+        for setting, defaultValue in pairs(defaults) do
+            if TurtleJournal_Settings[setting] == nil then
+                TurtleJournal_Settings[setting] = defaultValue
+                d:debug("Created new setting: " .. setting)
+            end
         end
     end
-end
 
--- small funcs
-function TJ.StartTyping()
-    local currentTime = GetTime()
-    local db = TurtleJournal_Settings
-    if db.sound and (currentTime - TJ.typing.lastSoundTime) >= TJ.typing.soundInterval then
-        TJ.typing.lastSoundTime = GetTime() -- reset timer
-        local randomIndex = math.random(table.getn(TJ.typing.soundFiles))
-        local selectedSound = TJ.typing.soundFiles[randomIndex]
-        PlaySoundFile(selectedSound, "Master")
-        TJ.debug("Started typing, played random sound #" .. randomIndex)
+    -- small funcs
+    function tj.StartTyping()        local currentTime = GetTime()
+        local db = TurtleJournal_Settings
+        if tj.frames.editBox.isFocused and db.sound and (currentTime - typing.lastSoundTime) >= typing.soundInterval then
+            typing.lastSoundTime = GetTime() -- reset timer
+            PlaySound("WriteQuest")
+            d:debug("Started typing, played sound")
+        end
+        if db.autoOpen then
+            tj.frames.sideEntryList:Show()
+            tj.frames.miniScrollPanel:Show()
+            d:debug("Opened journal")
+        end
     end
-end
 
-function TJ.SwooshSound()
-    local db = TurtleJournal_Settings
-    if db.sound then
-        if TJ.frames.main and TJ.frames.main:IsVisible() then
-            PlaySoundFile(TJ.typing.soundFiles2[1])
+    function tj.SetName()
+        StaticPopupDialogs["TURTLEJOURNAL_SET_NAME"] = {
+            text = "Enter a new name for your journal:",
+            button1 = "Accept",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 19,
+            OnAccept = function()
+                local editBox = getglobal(this:GetParent():GetName().."EditBox")
+                local text = editBox:GetText()
+                if text and text ~= "" then
+                    TurtleJournal_Settings.customName = text
+                    tj.frames.titleText:SetText(text)
+                    d:debug("Journal name changed to: " .. text)
+                end
+            end,
+            EditBoxOnEnterPressed = function()
+                local text = this:GetText()
+                if text and text ~= "" then
+                    TurtleJournal_Settings.customName = text
+                    tj.frames.titleText:SetText(text)
+                    d:debug("Journal name changed to: " .. text)
+                    this:GetParent():Hide()
+                end
+            end,
+            EditBoxOnEscapePressed = function()
+                this:GetParent():Hide()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+        }
+
+        StaticPopup_Show("TURTLEJOURNAL_SET_NAME")
+    end
+
+    function tj.SetBottomFrameColor()
+        local startTime = GetTime()
+        local duration = 1.0
+        local startColors = {}
+        local endColors = {}
+
+        -- set initial colors immediately without transition on first load
+        if not tj.initialColorSet then
+            tj.initialColorSet = true
+            if TurtleJournal_Settings.darkMode then
+                tj.frames.editBox:SetTextColor(1, 1, 1, 1)
+                tj.frames.titleEditBox:SetTextColor(1, 1, 1, 1)
+                tj.frames.frameTex:SetVertexColor(0.4, 0.4, 0.4, 1)
+                tj.frames.bottomOptionFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+                tj.frames.bottomOptionFrame2:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+                tj.frames.sideEntryList:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+                tj.frames.miniScrollPanel:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+                return -- skip the transition on initial load
+            end
+        end
+
+        -- store start and end colors based on dark mode
+        if TurtleJournal_Settings.darkMode then
+            startColors = {
+                editBox = {tj.frames.editBox:GetTextColor()},
+                titleEditBox = {tj.frames.titleEditBox:GetTextColor()},
+                frameTex = {tj.frames.frameTex:GetVertexColor()},
+                borders = {tj.frames.bottomOptionFrame:GetBackdropBorderColor()}
+            }
+            endColors = {
+                editBox = {1, 1, 1, 1},
+                titleEditBox = {1, 1, 1, 1},
+                frameTex = {0.4, 0.4, 0.4, 1},
+                borders = {0.4, 0.4, 0.4, 1}
+            }
         else
-            PlaySoundFile(TJ.typing.soundFiles2[2])
+            startColors = {
+                editBox = {tj.frames.editBox:GetTextColor()},
+                titleEditBox = {tj.frames.titleEditBox:GetTextColor()},
+                frameTex = {tj.frames.frameTex:GetVertexColor()},
+                borders = {tj.frames.bottomOptionFrame:GetBackdropBorderColor()}
+            }
+            endColors = {
+                editBox = {0, 0, 0, 1},
+                titleEditBox = {0, 0, 0, 1},
+                frameTex = {1, 1, 1, 1},
+                borders = {1, 1, 1, 1}
+            }
+        end
+
+        local function lerp(start, end_, progress)
+            return start + (end_ - start) * progress
+        end
+
+        local frame = CreateFrame("Frame")
+        frame:SetScript("OnUpdate", function()
+            local elapsed = GetTime() - startTime
+            local progress = math.min(elapsed / duration, 1)
+
+            -- update colors
+            local r, g, b, a
+
+            r = lerp(startColors.editBox[1], endColors.editBox[1], progress)
+            g = lerp(startColors.editBox[2], endColors.editBox[2], progress)
+            b = lerp(startColors.editBox[3], endColors.editBox[3], progress)
+            a = lerp(startColors.editBox[4], endColors.editBox[4], progress)
+            tj.frames.editBox:SetTextColor(r, g, b, a)
+            tj.frames.titleEditBox:SetTextColor(r, g, b, a)
+
+            r = lerp(startColors.frameTex[1], endColors.frameTex[1], progress)
+            g = lerp(startColors.frameTex[2], endColors.frameTex[2], progress)
+            b = lerp(startColors.frameTex[3], endColors.frameTex[3], progress)
+            a = lerp(startColors.frameTex[4], endColors.frameTex[4], progress)
+            tj.frames.frameTex:SetVertexColor(r, g, b, a)
+
+            r = lerp(startColors.borders[1], endColors.borders[1], progress)
+            g = lerp(startColors.borders[2], endColors.borders[2], progress)
+            b = lerp(startColors.borders[3], endColors.borders[3], progress)
+            a = lerp(startColors.borders[4], endColors.borders[4], progress)
+            tj.frames.bottomOptionFrame:SetBackdropBorderColor(r, g, b, a)
+            tj.frames.bottomOptionFrame2:SetBackdropBorderColor(r, g, b, a)
+            tj.frames.sideEntryList:SetBackdropBorderColor(r, g, b, a)
+            tj.frames.miniScrollPanel:SetBackdropBorderColor(r, g, b, a)
+
+            -- stop
+            if progress >= 1 then
+                this:SetScript("OnUpdate", nil)
+            end
+        end)
+    end
+
+    function tj.SetTimeFrame()
+        if TurtleJournal_Settings.time then
+            if not tj.frames.timeFrame then
+                local timeFrame = CreateFrame("Frame", nil, tj.frames.main)
+                timeFrame:SetWidth(200)
+                timeFrame:SetHeight(30)
+                timeFrame:SetFrameStrata("DIALOG")
+                timeFrame:SetPoint("TOP", tj.frames.main, "TOP", 0, -47)
+
+                local texture = timeFrame:CreateTexture(nil, "BACKGROUND")
+                texture:SetTexture("Interface\\AddOns\\Turtlejournal\\media\\QLgadgetframe.tga")
+                texture:SetPoint("TOPLEFT", timeFrame, "TOPLEFT", -80, 20)
+                texture:SetPoint("BOTTOMRIGHT", timeFrame, "BOTTOMRIGHT", 80, -20)
+
+                local text = timeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                text:SetPoint("CENTER", timeFrame, "CENTER", 0, 0)
+
+                local lastUpdate = 0
+                local updateInterval = 1.0
+
+                timeFrame:SetScript("OnUpdate", function()
+                    local currentTime = GetTime()
+                    if currentTime - lastUpdate >= updateInterval then
+                        text:SetText(date("%H:%M:%S - %d/%m/%Y"))
+                        lastUpdate = currentTime
+                    end
+                end)
+                tj.frames.timeFrame = timeFrame
+            else
+                tj.frames.timeFrame:Show()
+            end
+        else
+            if tj.frames.timeFrame then
+                tj.frames.timeFrame:Hide()
+            end
         end
     end
 
-    TJ.debug("Performed swoosh sound")
-end
+    function tj.SwooshSound()
+        local db = TurtleJournal_Settings
+        if db.sound then
+            if tj.frames.main and tj.frames.main:IsVisible() then
+                PlaySound("igQuestLogOpen")
+            else
+                PlaySound("igQuestLogClose")
+            end
+        end
 
-function TJ.MoveFrame(frame, direction, pixels, duration, visibility)
-    if not frame or not direction or not pixels then return end
-    duration = duration or 1
+        d:debug("Performed swoosh sound")
+    end
 
-    local startTime = GetTime()
-    local startPoint = { frame:GetPoint() }
-    local xMod, yMod = 0, 0
+    function tj.DoEmote(emoteName)
+        local db = TurtleJournal_Settings
 
-    if direction == "up" then yMod = pixels
-    elseif direction == "down" then yMod = -pixels
-    elseif direction == "left" then xMod = -pixels
-    elseif direction == "right" then xMod = pixels
-    else return end
+        if db.sit then
+            DoEmote(emoteName)
+            d:debug("Performed " .. emoteName .. " emote")
+        end
+    end
 
-    local function OnUpdate()
-        local elapsed = GetTime() - startTime
-        local progress = elapsed / duration
+    function tj.SetupFrameControls()
+        local frame = tj.frames.main
 
-        if progress >= 1 then
-            frame:SetPoint(startPoint[1], startPoint[2], startPoint[3],
-                startPoint[4] + xMod, startPoint[5] + yMod)
-            frame:SetScript("OnUpdate", nil)
+        frame:EnableMouseWheel(true)
+        frame:SetScript("OnMouseWheel", function()
+            local delta = arg1
 
-            -- handle visibility after movement completes
-            if visibility then
-                if visibility == "show" then
-                    frame:Show()
-                elseif visibility == "hide" then
-                    frame:Hide()
+            -- handle scaling with SHIFT
+            if IsShiftKeyDown() then
+                local currentScale = frame:GetScale()
+                local newScale = currentScale + (delta * 0.1)
+                newScale = math.max(0.5, math.min(1.3, newScale))
+                frame:SetScale(newScale)
+                TurtleJournal_Settings.scale = newScale
+                d:debug("Scale changed to: " .. newScale)
+
+            -- handle alpha with CTRL
+            elseif IsControlKeyDown() then
+                local currentAlpha = frame:GetAlpha()
+                local newAlpha = currentAlpha + (delta * 0.1)
+                newAlpha = math.max(0.1, math.min(1.0, newAlpha))
+                frame:SetAlpha(newAlpha)
+                TurtleJournal_Settings.alpha = newAlpha
+                d:debug("Alpha changed to: " .. newAlpha)
+            end
+        end)
+
+        -- apply saved settings on startup
+        if TurtleJournal_Settings.scale then
+            frame:SetScale(TurtleJournal_Settings.scale)
+        end
+        if TurtleJournal_Settings.alpha then
+            frame:SetAlpha(TurtleJournal_Settings.alpha)
+        end
+    end
+
+    function tj.SetupMainFrameOpener()
+        local oldHandler = PlayerFrame:GetScript("OnMouseUp")
+
+        PlayerFrame:SetScript("OnMouseUp", function()
+            -- check if shift is held and right mouse button was clicked
+            if IsShiftKeyDown() and arg1 == "LeftButton" then
+                if tj.frames.main:IsVisible() then
+                    tj.frames.main:Hide()
+                    tj.frames.bottomOptionFrame2:Hide()
+                    d:debug("TurtleJournal closed")
+                    tj.DoEmote("STAND")
+                    tj.SwooshSound()
+                else
+                    tj.frames.main:Show()
+                    if TurtleJournal_Settings.autoOpen then
+                        tj.frames.sideEntryList:Show()
+                        tj.frames.miniScrollPanel:Show()
+                    end
+                    d:debug("Opened journal")
+                    tj.SwooshSound()
+                    d:debug("TurtleJournal opened")
+                    tj.DoEmote("SIT")
+                end
+            elseif oldHandler then
+                -- call original handler if it exists
+                oldHandler(this, arg1)
+            end
+        end)
+    end
+
+    function tj.UpdateSaveButtonState()
+        local saveButton = tj.frames.saveButton
+        if tj.currentViewingEntry then
+            saveButton:Disable()
+        else
+            saveButton:Enable()
+        end
+    end
+
+    -- main funcs
+    tj.currentViewingEntry = nil  -- to check for currently viewed in order to disable savebtn
+
+    function tj.GetEntries(dateStr)
+        local db = TurtleJournal_DB
+        dateStr = dateStr or date("%Y-%m-%d")
+
+        if not db[dateStr] then
+            d:debug("No entries found on date: " .. dateStr)
+            return nil
+        end
+
+        return db[dateStr]
+    end
+
+    function tj.SelectEntry(dateStr, entryId)
+        if not entryId then
+            d:debug("Error: Missing parameters")
+            return nil
+        end
+
+        dateStr = dateStr or date("%Y-%m-%d")
+        local entries = tj.GetEntries(dateStr)
+        if entries and entries[entryId] then
+            tj.currentViewingEntry = {dateStr = dateStr, entryId = entryId}
+            return entries[entryId]
+        end
+        tj.currentViewingEntry = nil
+        return nil
+    end
+
+    function tj.SaveEntry()
+        -- if viewing an existing entry, don't allow saving
+        if tj.currentViewingEntry then
+            d:debug("Error: Cannot save while viewing an existing entry")
+            d:print("Cannot save while viewing an existing entry. Create a new entry instead.")
+            return false
+        end
+
+        -- get content from editboxes
+        local content = tj.frames.editBox:GetText()
+        local title = tj.frames.titleEditBox:GetText()
+
+        -- input validation
+        if not title or title == "" then
+            d:debug("Error: Title cannot be empty")
+            d:print("Title cannot be empty. Please enter a title.")
+            tj.frames.titleEditBox:SetFocus()
+            return false
+        end
+        if not content or content == "" then
+            d:debug("Error: Content cannot be empty")
+            d:print("Content cannot be empty. Please enter some text.")
+            tj.frames.editBox:SetFocus()
+            return false
+        end
+
+        -- content length check
+        local MAX_CONTENT_LENGTH = 4000
+        if string.len(content) > MAX_CONTENT_LENGTH then
+            d:debug("Error: Content exceeds maximum length of " .. MAX_CONTENT_LENGTH)
+            d:print("Content exceeds maximum length of " .. MAX_CONTENT_LENGTH.. " characters. Please shorten your entry.")
+            return false
+        end
+
+        -- create backup of current entries for this date
+        local db = TurtleJournal_DB
+        local dateStr = date("%Y-%m-%d")
+        d:print("Created backup.")
+        local backup = nil
+        if db[dateStr] then
+            backup = {}
+            for k, v in pairs(db[dateStr]) do
+                backup[k] = v
+            end
+        end
+
+        -- check if date exists in the database
+        if not db[dateStr] then
+            db[dateStr] = {}
+            d:debug("Created new date entry: " .. dateStr)
+        end
+
+        -- find the next available index for the entry
+        local maxIdx = 0
+        for k, _ in pairs(db[dateStr]) do
+            local num = tonumber(k)
+            if num and num > maxIdx then
+                maxIdx = num
+            end
+        end
+        local nextIdx = maxIdx + 1
+
+        -- create entry structure (removed timestamp for now)
+        local entry = {
+            title = title,
+            content = content
+        }
+
+        -- try to add the new entry
+        local success = true
+        local function addEntry()
+            db[dateStr][tostring(nextIdx)] = entry
+        end
+        success = pcall(addEntry)
+
+        -- if the entry failed, restore the backup
+        if not success and backup then
+            db[dateStr] = backup
+            d:debug("Error: Entry failed, restored from backup")
+            d:print("Error: Entry failed, restored from backup.")
+            return false
+        end
+
+        -- if both fails, sad day
+        if not success and not backup then
+            d:debug("Error: Entry failed, no backup available")
+            d:print("Error: Entry failed, no backup available.")
+            return false
+        end
+
+        -- hurray
+        tj.frames.leftScrollFrame:SetVerticalScroll(0)
+        d:print("Entry ".. d.colors.green .."successful|r.")
+
+        -- clear the input boxes
+        tj.frames.editBox:SetText("")
+        tj.frames.titleEditBox:SetText("")
+
+        -- refresh the entry list
+        tj.UpdateEntryList()
+
+        d:debug("Added entry #" .. nextIdx .. " on " .. dateStr)
+        return true
+    end
+
+    StaticPopupDialogs["TURTLEJOURNAL_DELETE_CONFIRM"] = {
+        text = "Are you sure you want to delete this entry?",
+        button1 = "Yes",
+        button2 = "No",
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+        OnAccept = function()
+            local dateStr = tj.selectedEntry.dateStr
+            local entryId = tj.selectedEntry.id
+            local db = TurtleJournal_DB
+
+            -- check if entry exists
+            if not db[dateStr] or
+               not db[dateStr][entryId] then
+                d:debug("Error: Entry not found")
+                StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")
+                return false
+            end
+
+            -- create backup
+            local backup = db[dateStr][entryId]
+            d:print("Created backup.")
+
+            -- try to delete the entry
+            local success = true
+            local function removeEntry()
+                db[dateStr][entryId] = nil
+                d:print("Entry ".. d.colors.green .."deleted|r.")
+                tj.currentViewingEntry = nil
+                tj.UpdateSaveButtonState()
+                -- cleanup empty tables
+                if next(db[dateStr]) == nil then
+                    db[dateStr] = nil
                 end
             end
 
-            TJ.debug("Moved frame " .. direction .. " by " .. pixels .. " pixels over " .. duration .. "s")
-            return
-        end
+            -- use pcall to catch any errors
+            success = pcall(removeEntry)
 
-        frame:SetPoint(startPoint[1], startPoint[2], startPoint[3],
-            startPoint[4] + (xMod * progress), startPoint[5] + (yMod * progress))
-    end
-
-    frame:SetScript("OnUpdate", OnUpdate)
-end
-
-function TJ.DoEmote(emoteName)
-    local db = TurtleJournal_Settings
-
-    if db.sit then
-        DoEmote(emoteName)
-        TJ.debug("Performed " .. emoteName .. " emote")
-    end
-end
-
-function TJ.SetupFrameControls()
-    local frame = TJ.frames.main
-
-    frame:EnableMouseWheel(true)
-    frame:SetScript("OnMouseWheel", function()
-        local delta = arg1
-
-        -- handle scaling with SHIFT
-        if IsShiftKeyDown() then
-            local currentScale = frame:GetScale()
-            local newScale = currentScale + (delta * 0.1)
-            newScale = math.max(0.5, math.min(2.0, newScale))
-            frame:SetScale(newScale)
-            TurtleJournal_Settings.scale = newScale
-            TJ.debug("Scale changed to: " .. newScale)
-
-        -- handle alpha with CTRL
-        elseif IsControlKeyDown() then
-            local currentAlpha = frame:GetAlpha()
-            local newAlpha = currentAlpha + (delta * 0.1)
-            newAlpha = math.max(0.2, math.min(1.0, newAlpha))
-            frame:SetAlpha(newAlpha)
-            TurtleJournal_Settings.alpha = newAlpha
-            TJ.debug("Alpha changed to: " .. newAlpha)
-        end
-    end)
-
-    -- apply saved settings on startup
-    if TurtleJournal_Settings.scale then
-        frame:SetScale(TurtleJournal_Settings.scale)
-    end
-    if TurtleJournal_Settings.alpha then
-        frame:SetAlpha(TurtleJournal_Settings.alpha)
-    end
-end
-
-function TJ.SetupMainFrameOpener()
-    local oldHandler = PlayerFrame:GetScript("OnMouseUp")
-
-    PlayerFrame:SetScript("OnMouseUp", function()
-        -- check if shift is held and right mouse button was clicked
-        if IsShiftKeyDown() and arg1 == "LeftButton" then
-            if TJ.frames.main:IsVisible() then
-                TJ.frames.main:Hide()
-                TJ.debug("TurtleJournal closed")
-                TJ.DoEmote("STAND")
-                TJ.SwooshSound()
-            else
-                TJ.frames.main:Show()
-                TJ.SwooshSound()
-                TJ.debug("TurtleJournal opened")
-                TJ.DoEmote("SIT")
+            -- if deletion failed, restore from backup
+            if not success then
+                db[dateStr][entryId] = backup
+                d:debug("Error: Delete failed, restored from backup")
+                StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")
+                return false
             end
-        elseif oldHandler then
-            -- call original handler if it exists
-            oldHandler(this, arg1)
-        end
-    end)
-end
 
--- funcs
-function TJ.GetEntries(dateStr)
-    local db = TurtleJournal_DB
-    dateStr = dateStr or date("%Y-%m-%d")
-
-    if not db[dateStr] then
-        TJ.debug("No entries found on date: " .. dateStr)
-        return nil
-    end
-
-    return db[dateStr]
-end
-
-function TJ.SelectEntry(dateStr, entryId)
-    if not entryId then
-        TJ.debug("Error: Missing parameters")
-        return nil
-    end
-
-    dateStr = dateStr or date("%Y-%m-%d")
-    local entries = TJ.GetEntries(dateStr)
-    if entries and entries[entryId] then
-        return entries[entryId]
-    end
-    return nil
-end
-
-StaticPopupDialogs["TURTLEJOURNAL_DELETE_CONFIRM"] = {
-    text = "Are you sure you want to delete this entry?",
-    button1 = "Yes",
-    button2 = "No",
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-    OnAccept = function()
-        local dateStr = TJ.selectedEntry.dateStr
-        local entryId = TJ.selectedEntry.id
-        local db = TurtleJournal_DB
-
-        -- check if entry exists
-        if not db[dateStr] or
-           not db[dateStr][entryId] then
-            TJ.debug("Error: Entry not found")
-            StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")
-            return false
-        end
-
-        -- create backup
-        local backup = db[dateStr][entryId]
-
-        -- try to delete the entry
-        local success = true
-        local function removeEntry()
-            db[dateStr][entryId] = nil
-
-            -- cleanup empty tables
-            if next(db[dateStr]) == nil then
-                db[dateStr] = nil
+            -- clear selection
+            tj.selectedEntry = nil
+            if tj.selectedButton then
+                tj.selectedButton:UnlockHighlight()
+                tj.selectedButton = nil
             end
-        end
 
-        -- use pcall to catch any errors
-        success = pcall(removeEntry)
+            -- refresh the entry list
+            tj.UpdateEntryList(dateStr)
+            tj.frames.editBox:SetText("")
+            tj.frames.titleEditBox:SetText("")
 
-        -- if deletion failed, restore from backup
-        if not success then
-            db[dateStr][entryId] = backup
-            TJ.debug("Error: Delete failed, restored from backup")
+            -- hide the entire popup after successful deletion
             StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")
-            return false
-        end
-
-        -- clear selection
-        TJ.selectedEntry = nil
-        if TJ.selectedButton then
-            TJ.selectedButton:UnlockHighlight()
-            TJ.selectedButton = nil
-        end
-
-        -- refresh the entry list
-        TJ.UpdateEntryList(dateStr)
-        TJ.frames.editBox:SetText("")
-        TJ.frames.titleBox:SetText("")
-
-        -- hide the entire popup after successful deletion
-        StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")
-        TJ.debug("Deleted entry #" .. entryId .. " on " .. dateStr)
-        return true
-    end,
-}
-
-function TJ.DeleteEntry()
-    if not TJ.selectedEntry then
-        TJ.debug("Error: No entry selected")
-        TJ.print("No entry selected. Please select an entry to delete.")
-        return false
-    end
-
-    -- show the confirmation dialog
-    StaticPopup_Show("TURTLEJOURNAL_DELETE_CONFIRM")
-end
-
-function TJ.SaveEntry()
-    -- get content from editboxes
-    local content = TJ.frames.editBox:GetText()
-    local title = TJ.frames.titleBox:GetText()
-
-    -- input validation
-    if not title or title == "" then
-        TJ.debug("Error: Title cannot be empty")
-        TJ.print("Title cannot be empty. Please enter a title.")
-        TJ.frames.titleBox:SetFocus()
-        return false
-    end
-    if not content or content == "" then
-        TJ.debug("Error: Content cannot be empty")
-        TJ.print("Content cannot be empty. Please enter some text.")
-        TJ.frames.editBox:SetFocus()
-        return false
-    end
-
-    -- content length check
-    local MAX_CONTENT_LENGTH = 700
-    if string.len(content) > MAX_CONTENT_LENGTH then
-        TJ.debug("Error: Content exceeds maximum length of " .. MAX_CONTENT_LENGTH)
-        TJ.print("Content exceeds maximum length of " .. MAX_CONTENT_LENGTH.. " characters. Please shorten your entry.")
-        return false
-    end
-
-    local db = TurtleJournal_DB
-    local dateStr = date("%Y-%m-%d")
-
-    -- create backup of current entries for this date
-    local backup = nil
-    if db[dateStr] then
-        backup = {}
-        for k, v in pairs(db[dateStr]) do
-            backup[k] = v
-        end
-    end
-
-    -- check if date exists in the database
-    if not db[dateStr] then
-        db[dateStr] = {}
-        TJ.debug("Created new date entry: " .. dateStr)
-    end
-
-    -- find the next available index for the entry
-    local maxIdx = 0
-    for k, _ in pairs(db[dateStr]) do
-        local num = tonumber(k)
-        if num and num > maxIdx then
-            maxIdx = num
-        end
-    end
-
-    -- increment the index for the new entry
-    local nextIdx = maxIdx + 1
-
-    -- create entry structure (removed timestamp for now)
-    local entry = {
-        title = title,
-        content = content
+            d:debug("Deleted entry #" .. entryId .. " on " .. dateStr)
+            return true
+        end,
     }
 
-    -- try to add the new entry
-    local success = true
-    local function addEntry()
-        db[dateStr][tostring(nextIdx)] = entry
+    function tj.DeleteEntry()
+        if not tj.selectedEntry then
+            d:debug("Error: No entry selected")
+            d:print("No entry selected. Please select an entry to delete.")
+            return false
+        end
+
+        -- show the confirmation dialog
+        StaticPopup_Show("TURTLEJOURNAL_DELETE_CONFIRM")
     end
 
-    -- use pcall to catch any errors
-    success = pcall(addEntry)
-
-    -- if the entry failed, restore the backup
-    if not success and backup then
-        db[dateStr] = backup
-        TJ.debug("Error: Entry failed, restored from backup")
-        return false
-    end
-
-    -- clear the input boxes
-    TJ.frames.editBox:SetText("")
-    TJ.frames.titleBox:SetText("")
-
-    -- refresh the entry list
-    TJ.UpdateEntryList(dateStr)
-
-    TJ.debug("Added entry #" .. nextIdx .. " on " .. dateStr)
-    return true
-end
+    -- run it
+    tj:InitializeSettings()
+end)
