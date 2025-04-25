@@ -399,11 +399,15 @@ tj:RegisterModule("gui", function ()
         entryButton:SetText("<")
         entryButton:SetScript("OnClick", function()
             if sideEntryList:IsVisible() then
-                PlaySound("igAbilityClose")
+                if TurtleJournal_Settings.sound then
+                    PlaySound("igAbilityClose")
+                end
                 sideEntryList:Hide()
                 miniScrollPanel:Hide()
             else
-                PlaySound("igAbilityOpen")
+                if TurtleJournal_Settings.sound then
+                    PlaySound("igAbilityOpen")
+                end
                 sideEntryList:Show()
                 miniScrollPanel:Show()
             end
@@ -425,9 +429,13 @@ tj:RegisterModule("gui", function ()
         optionsButton:SetScript("OnClick", function()
             if bottomOptionFrame2:IsVisible() then
                 bottomOptionFrame2:Hide()
-                PlaySound("igAbilityClose")
+                if TurtleJournal_Settings.sound then
+                    PlaySound("igAbilityClose")
+                end
             else
-                PlaySound("igAbilityOpen")
+                if TurtleJournal_Settings.sound then
+                    PlaySound("igAbilityOpen")
+                end
                 bottomOptionFrame2:Show()
             end
         end)
