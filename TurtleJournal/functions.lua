@@ -17,6 +17,7 @@ tj:RegisterModule("functions", function()
         focus = true,
         limit = true,
         sit = true,
+        centerText = true,
         scale = 1,
         alpha = 1.0,
     }
