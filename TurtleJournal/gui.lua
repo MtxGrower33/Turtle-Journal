@@ -68,7 +68,11 @@ tj:RegisterModule("gui", function ()
         editBox:EnableMouse(true)
         editBox:SetText("")
         editBox:SetFont("Fonts\\FRIZQT__.TTF", 15, "")
-        editBox:SetJustifyH("CENTER")
+        if TurtleJournal_Settings.centerText then
+            editBox:SetJustifyH("CENTER")
+        else
+            editBox:SetJustifyH("LEFT")
+        end
         editBox:SetScript("OnEscapePressed", function() this:ClearFocus() end)
         editBox:SetScript("OnTabPressed", function () tj.frames.titleEditBox:SetFocus() end)
 
@@ -163,8 +167,7 @@ tj:RegisterModule("gui", function ()
             if this.isFocused then
                 local text = this:GetText()
 
-                tj.currentViewingEntry = nil
-                tj.UpdateSaveButtonState()
+                tj.frames.saveButton:Enable()
 
                 CheckTextLimits(text)
                 ScrollToTop()
@@ -189,6 +192,7 @@ tj:RegisterModule("gui", function ()
         titleEditBox:SetScript("OnEnterPressed", function() tj.frames.editBox:SetFocus() end)
         titleEditBox:SetScript("OnTabPressed", function () tj.frames.editBox:SetFocus() end)
         titleEditBox:SetScript("OnTextChanged", function ()
+            tj.frames.saveButton:Enable()
             tj.StartTyping()
             d:debug("typing...")
         end)
@@ -231,7 +235,6 @@ tj:RegisterModule("gui", function ()
                         title = entry.title,
                         dateStr = date,
                         originalId = id,
-                        numericId = tonumber(id) or 0  -- convert ID to number for sorting
                     }
                 end
             end
@@ -261,7 +264,7 @@ tj:RegisterModule("gui", function ()
 
             -- sort entries by numeric ID (reversed - highest to lowest)
             table.sort(sortedEntries, function(a, b)
-                return tonumber(a.entry.numericId) > tonumber(b.entry.numericId)
+                return a.compoundId > b.compoundId
             end)
 
 
@@ -289,7 +292,11 @@ tj:RegisterModule("gui", function ()
                     button.text:SetWidth(190)
                 end
 
-                button.text:SetText(entry.dateStr .. ": " .. entry.title)
+                if TurtleJournal_Settings.time then
+                    button.text:SetText(entry.dateStr .. ": " .. entry.title)
+                else
+                    button.text:SetText(entry.title)
+                end
                 button:Show()
 
                 button.entryData = {
@@ -297,33 +304,23 @@ tj:RegisterModule("gui", function ()
                     id = tostring(entry.originalId)
                 }
 
-                button.lastClickTime = 0
-
                 button:SetScript("OnClick", function()
                     local data = this.entryData
-                    local currentTime = GetTime()
-                    local timeSinceLastClick = currentTime - this.lastClickTime
                     editBox:ClearFocus()
                     titleEditBox:ClearFocus()
-                    if timeSinceLastClick < 0.4 then
-                        tj.DisplayEntry(data.dateStr, data.id)
-                        editBox:ClearFocus()
-                        titleEditBox:ClearFocus()
-                        editboxScrollframe:SetVerticalScroll(0)
-                        tj.UpdateSaveButtonState()
-                        d:debug("Double clicked on entry #" .. data.id .. " on " .. data.dateStr)
-                    else
-                        if tj.selectedButton then
-                            tj.selectedButton:UnlockHighlight()
-                        end
-                        this:LockHighlight()
-                        tj.selectedButton = this
-                        tj.selectedEntry = data
-                        d:debug("Selected entry #" .. data.id .. " on " .. data.dateStr)
-                        tj.UpdateSaveButtonState()
+                    
+                    if tj.selectedButton then
+                        tj.selectedButton:UnlockHighlight()
                     end
-
-                    this.lastClickTime = currentTime
+                    this:LockHighlight()
+                    tj.selectedButton = this
+                    tj.selectedEntry = data
+                    d:debug("Selected entry #" .. data.id .. " on " .. data.dateStr)
+                
+                    tj.DisplayEntry(data.dateStr, data.id)
+                    editBox:ClearFocus()
+                    titleEditBox:ClearFocus()
+                    editboxScrollframe:SetVerticalScroll(0)
                 end)
 
                 tj.frames.sideEntryList.buttons[compoundId] = button
@@ -373,7 +370,7 @@ tj:RegisterModule("gui", function ()
 
         local bottomOptionFrame2 = CreateFrame("Frame", "MyBottomOptionFrame2", mainFrame)
         bottomOptionFrame2:SetWidth(300)
-        bottomOptionFrame2:SetHeight(100)
+        bottomOptionFrame2:SetHeight(120)
         bottomOptionFrame2:SetPoint("TOP", bottomOptionFrame, "BOTTOM", 0, 5)
         bottomOptionFrame2:SetFrameStrata("HIGH")
         bottomOptionFrame2:EnableMouse(true)
@@ -479,10 +476,15 @@ tj:RegisterModule("gui", function ()
             end
             editBox:SetText("")
             tj.currentViewingEntry = nil
-            tj.UpdateSaveButtonState()
             ScrollToTop()
-            titleEditBox:SetText("")
+            titleEditBox:SetText("Title")
             titleEditBox:SetFocus()
+            tj.SaveEntry(true)
+            tj.selectedEntry = nil
+            if tj.selectedButton then
+                tj.selectedButton:UnlockHighlight()
+                tj.selectedButton = nil
+            end
         end)
         newButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -499,7 +501,8 @@ tj:RegisterModule("gui", function ()
         saveButton:SetPoint("LEFT", newButton, "RIGHT", 5, 0)
         saveButton:SetText("Save")
         saveButton:SetScript("OnClick", function()
-            tj.SaveEntry()
+            tj.SaveEntry(false)
+            tj.frames.saveButton:Disable()
         end)
         saveButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -679,6 +682,8 @@ tj:RegisterModule("gui", function ()
         timeCheckbox:SetScript("OnClick", function()
             TurtleJournal_Settings.time = (this:GetChecked() == 1)
             tj.SetTimeFrame()
+            -- refresh the entry list
+            tj.UpdateEntryList()
             d:debug("Time setting changed to: "..tostring(TurtleJournal_Settings.time))
         end)
         timeCheckbox:SetScript("OnEnter", function()
@@ -689,11 +694,35 @@ tj:RegisterModule("gui", function ()
         timeCheckbox:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
-
+        
+        local centeringCheckbox = CreateFrame("CheckButton", "TJCenteringCheckbox", bottomOptionFrame2, "UICheckButtonTemplate")
+        centeringCheckbox:SetPoint("TOP", timeCheckbox, "BOTTOM", 0, 0)
+        centeringCheckbox:SetWidth(20)
+        centeringCheckbox:SetHeight(20)
+        getglobal(centeringCheckbox:GetName().."Text"):SetText("Center")
+        centeringCheckbox:SetChecked(TurtleJournal_Settings.centerText)
+        centeringCheckbox:SetScript("OnClick", function()
+            TurtleJournal_Settings.centerText = (this:GetChecked() == 1)
+            if TurtleJournal_Settings.centerText then
+                editBox:SetJustifyH("CENTER")
+            else
+                editBox:SetJustifyH("LEFT")
+            end
+            d:debug("Center setting changed to: "..tostring(TurtleJournal_Settings.centerText))
+        end)
+        centeringCheckbox:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Toggle text centering in journal entries")
+            GameTooltip:Show()
+        end)
+        centeringCheckbox:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        
         local nameButton = CreateFrame("Button", nil, bottomOptionFrame2, "UIPanelButtonTemplate")
         nameButton:SetWidth(59)
         nameButton:SetHeight(15)
-        nameButton:SetPoint("TOPLEFT", timeCheckbox, "BOTTOMLEFT", -10, -5)
+        nameButton:SetPoint("TOPLEFT", centeringCheckbox, "BOTTOMLEFT", -10, -5)
         nameButton:SetText("Name")
         nameButton:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
         nameButton:SetScript("OnClick", function()
