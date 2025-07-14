@@ -235,7 +235,6 @@ tj:RegisterModule("gui", function ()
                         title = entry.title,
                         dateStr = date,
                         originalId = id,
-                        numericId = tonumber(id) or 0  -- convert ID to number for sorting
                     }
                 end
             end
@@ -265,7 +264,7 @@ tj:RegisterModule("gui", function ()
 
             -- sort entries by numeric ID (reversed - highest to lowest)
             table.sort(sortedEntries, function(a, b)
-                return tonumber(a.entry.numericId) > tonumber(b.entry.numericId)
+                return a.compoundId > b.compoundId
             end)
 
 
