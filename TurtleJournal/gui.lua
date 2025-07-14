@@ -292,7 +292,11 @@ tj:RegisterModule("gui", function ()
                     button.text:SetWidth(190)
                 end
 
-                button.text:SetText(entry.dateStr .. ": " .. entry.title)
+                if TurtleJournal_Settings.time then
+                    button.text:SetText(entry.dateStr .. ": " .. entry.title)
+                else
+                    button.text:SetText(entry.title)
+                end
                 button:Show()
 
                 button.entryData = {
@@ -678,6 +682,8 @@ tj:RegisterModule("gui", function ()
         timeCheckbox:SetScript("OnClick", function()
             TurtleJournal_Settings.time = (this:GetChecked() == 1)
             tj.SetTimeFrame()
+            -- refresh the entry list
+            tj.UpdateEntryList()
             d:debug("Time setting changed to: "..tostring(TurtleJournal_Settings.time))
         end)
         timeCheckbox:SetScript("OnEnter", function()
