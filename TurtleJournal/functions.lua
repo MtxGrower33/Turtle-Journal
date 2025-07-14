@@ -350,14 +350,7 @@ tj:RegisterModule("functions", function()
         return nil
     end
 
-    function tj.SaveEntry()
-        -- if viewing an existing entry, don't allow saving
-        if tj.currentViewingEntry then
-            d:debug("Error: Cannot save while viewing an existing entry")
-            d:print("Cannot save while viewing an existing entry. Create a new entry instead.")
-            return false
-        end
-
+    function tj.SaveEntry(makeNew)
         -- get content from editboxes
         local content = tj.frames.editBox:GetText()
         local title = tj.frames.titleEditBox:GetText()
@@ -369,12 +362,6 @@ tj:RegisterModule("functions", function()
             tj.frames.titleEditBox:SetFocus()
             return false
         end
-        if not content or content == "" then
-            d:debug("Error: Content cannot be empty")
-            d:print("Content cannot be empty. Please enter some text.")
-            tj.frames.editBox:SetFocus()
-            return false
-        end
 
         -- content length check
         local MAX_CONTENT_LENGTH = 4000
@@ -384,34 +371,44 @@ tj:RegisterModule("functions", function()
             return false
         end
 
-        -- create backup of current entries for this date
         local db = TurtleJournal_DB
-        local dateStr = date("%Y-%m-%d")
-        d:print("Created backup.")
+        local dateStr = nil
         local backup = nil
-        if db[dateStr] then
-            backup = {}
-            for k, v in pairs(db[dateStr]) do
-                backup[k] = v
+        
+        if makeNew then
+            -- create backup of current entries for this date
+            dateStr = date("%Y-%m-%d")
+            if db[dateStr] then
+                backup = {}
+                for k, v in pairs(db[dateStr]) do
+                    backup[k] = v
+                end
             end
-        end
 
-        -- check if date exists in the database
-        if not db[dateStr] then
-            db[dateStr] = {}
-            d:debug("Created new date entry: " .. dateStr)
-        end
-
-        -- find the next available index for the entry
-        local maxIdx = 0
-        for k, _ in pairs(db[dateStr]) do
-            local num = tonumber(k)
-            if num and num > maxIdx then
-                maxIdx = num
+            -- check if date exists in the database
+            if not db[dateStr] then
+                db[dateStr] = {}
+                d:debug("Created new date entry: " .. dateStr)
             end
+        else
+            dateStr = tj.currentViewingEntry.dateStr
         end
-        local nextIdx = maxIdx + 1
 
+        local noteIdx = nil
+        if makeNew then
+            -- find the next available index for the entry
+            local maxIdx = 0
+            for k, _ in pairs(db[dateStr]) do
+                local num = tonumber(k)
+                if num and num > maxIdx then
+                    maxIdx = num
+                end
+            end
+            noteIdx = maxIdx + 1;
+        else
+            noteIdx = tj.currentViewingEntry.entryId
+        end
+        
         -- create entry structure (removed timestamp for now)
         local entry = {
             title = title,
@@ -421,7 +418,7 @@ tj:RegisterModule("functions", function()
         -- try to add the new entry
         local success = true
         local function addEntry()
-            db[dateStr][tostring(nextIdx)] = entry
+            db[dateStr][tostring(noteIdx)] = entry
         end
         success = pcall(addEntry)
 
@@ -442,16 +439,17 @@ tj:RegisterModule("functions", function()
 
         -- hurray
         tj.frames.leftScrollFrame:SetVerticalScroll(0)
-        d:print("Entry ".. d.colors.green .."successful|r.")
-
-        -- clear the input boxes
-        tj.frames.editBox:SetText("")
-        tj.frames.titleEditBox:SetText("")
+        d:print("Entry ".. d.colors.green .."saved|r.")
 
         -- refresh the entry list
         tj.UpdateEntryList()
 
-        d:debug("Added entry #" .. nextIdx .. " on " .. dateStr)
+        d:debug("Added entry #" .. noteIdx .. " on " .. dateStr)
+        
+        if makeNew then
+            tj.currentViewingEntry = {dateStr = dateStr, entryId = noteIdx}
+        end
+
         return true
     end
 
@@ -478,7 +476,6 @@ tj:RegisterModule("functions", function()
 
             -- create backup
             local backup = db[dateStr][entryId]
-            d:print("Created backup.")
 
             -- try to delete the entry
             local success = true
@@ -486,7 +483,7 @@ tj:RegisterModule("functions", function()
                 db[dateStr][entryId] = nil
                 d:print("Entry ".. d.colors.green .."deleted|r.")
                 tj.currentViewingEntry = nil
-                tj.UpdateSaveButtonState()
+                tj.frames.saveButton:Disable()
                 -- cleanup empty tables
                 if next(db[dateStr]) == nil then
                     db[dateStr] = nil

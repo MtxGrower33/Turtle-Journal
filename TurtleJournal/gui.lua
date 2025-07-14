@@ -163,8 +163,7 @@ tj:RegisterModule("gui", function ()
             if this.isFocused then
                 local text = this:GetText()
 
-                tj.currentViewingEntry = nil
-                tj.UpdateSaveButtonState()
+                tj.frames.saveButton:Enable()
 
                 CheckTextLimits(text)
                 ScrollToTop()
@@ -189,6 +188,7 @@ tj:RegisterModule("gui", function ()
         titleEditBox:SetScript("OnEnterPressed", function() tj.frames.editBox:SetFocus() end)
         titleEditBox:SetScript("OnTabPressed", function () tj.frames.editBox:SetFocus() end)
         titleEditBox:SetScript("OnTextChanged", function ()
+            tj.frames.saveButton:Enable()
             tj.StartTyping()
             d:debug("typing...")
         end)
@@ -479,10 +479,15 @@ tj:RegisterModule("gui", function ()
             end
             editBox:SetText("")
             tj.currentViewingEntry = nil
-            tj.UpdateSaveButtonState()
             ScrollToTop()
-            titleEditBox:SetText("")
+            titleEditBox:SetText("Title")
             titleEditBox:SetFocus()
+            tj.SaveEntry(true)
+            tj.selectedEntry = nil
+            if tj.selectedButton then
+                tj.selectedButton:UnlockHighlight()
+                tj.selectedButton = nil
+            end
         end)
         newButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -499,7 +504,8 @@ tj:RegisterModule("gui", function ()
         saveButton:SetPoint("LEFT", newButton, "RIGHT", 5, 0)
         saveButton:SetText("Save")
         saveButton:SetScript("OnClick", function()
-            tj.SaveEntry()
+            tj.SaveEntry(false)
+            tj.frames.saveButton:Disable()
         end)
         saveButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
