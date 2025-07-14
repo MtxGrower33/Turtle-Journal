@@ -300,33 +300,23 @@ tj:RegisterModule("gui", function ()
                     id = tostring(entry.originalId)
                 }
 
-                button.lastClickTime = 0
-
                 button:SetScript("OnClick", function()
                     local data = this.entryData
-                    local currentTime = GetTime()
-                    local timeSinceLastClick = currentTime - this.lastClickTime
                     editBox:ClearFocus()
                     titleEditBox:ClearFocus()
-                    if timeSinceLastClick < 0.4 then
-                        tj.DisplayEntry(data.dateStr, data.id)
-                        editBox:ClearFocus()
-                        titleEditBox:ClearFocus()
-                        editboxScrollframe:SetVerticalScroll(0)
-                        tj.UpdateSaveButtonState()
-                        d:debug("Double clicked on entry #" .. data.id .. " on " .. data.dateStr)
-                    else
-                        if tj.selectedButton then
-                            tj.selectedButton:UnlockHighlight()
-                        end
-                        this:LockHighlight()
-                        tj.selectedButton = this
-                        tj.selectedEntry = data
-                        d:debug("Selected entry #" .. data.id .. " on " .. data.dateStr)
-                        tj.UpdateSaveButtonState()
+                    
+                    if tj.selectedButton then
+                        tj.selectedButton:UnlockHighlight()
                     end
-
-                    this.lastClickTime = currentTime
+                    this:LockHighlight()
+                    tj.selectedButton = this
+                    tj.selectedEntry = data
+                    d:debug("Selected entry #" .. data.id .. " on " .. data.dateStr)
+                
+                    tj.DisplayEntry(data.dateStr, data.id)
+                    editBox:ClearFocus()
+                    titleEditBox:ClearFocus()
+                    editboxScrollframe:SetVerticalScroll(0)
                 end)
 
                 tj.frames.sideEntryList.buttons[compoundId] = button
