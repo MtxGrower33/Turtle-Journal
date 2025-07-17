@@ -246,10 +246,16 @@ tj:RegisterModule("gui", function ()
                 end
             end
 
-            -- if no entries, we're done
+            -- No entries exist, not even the auto-generated default one
             if not next(allEntries) then
                 tj.frames.sideEntryList.buttons = {}
                 leftScrollChild:SetHeight(leftScrollFrame:GetHeight())
+                
+                -- make a new blank one so we never get a state where the page is empty as behavior then is unintuitive
+                editBox:SetText("")
+                titleEditBox:SetText("Title")
+                titleEditBox:SetFocus()
+                tj.SaveEntry(true)
                 return
             end
 
@@ -272,6 +278,7 @@ tj:RegisterModule("gui", function ()
 
             local buttonHeight = 25
             local offset = 15
+            local firstEntry = true
 
             -- create buttons using sorted entries
             for _, sortedEntry in ipairs(sortedEntries) do
@@ -325,6 +332,16 @@ tj:RegisterModule("gui", function ()
 
                 tj.frames.sideEntryList.buttons[compoundId] = button
                 offset = offset + buttonHeight + 2
+                
+                if firstEntry and not tj.selectedEntry then
+                    leftScrollFrame:SetVerticalScroll(0)
+                    tj.selectedEntry = button.entryData
+                    tj.selectedButton = button
+                    button:LockHighlight()
+                    tj.DisplayEntry(button.entryData.dateStr, button.entryData.id)
+                end
+                
+                firstEntry = false
             end
         end
 
@@ -479,12 +496,12 @@ tj:RegisterModule("gui", function ()
             ScrollToTop()
             titleEditBox:SetText("Title")
             titleEditBox:SetFocus()
-            tj.SaveEntry(true)
             tj.selectedEntry = nil
             if tj.selectedButton then
                 tj.selectedButton:UnlockHighlight()
                 tj.selectedButton = nil
             end
+            tj.SaveEntry(true)
         end)
         newButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
