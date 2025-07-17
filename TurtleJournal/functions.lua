@@ -439,7 +439,6 @@ tj:RegisterModule("functions", function()
         end
 
         -- refresh the entry list
-        tj.frames.leftScrollFrame:SetVerticalScroll(0)
         tj.UpdateEntryList()
 
         d:debug("Added entry #" .. noteIdx .. " on " .. dateStr)
