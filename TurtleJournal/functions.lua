@@ -311,17 +311,7 @@ tj:RegisterModule("functions", function()
         end)
     end
 
-    function tj.UpdateSaveButtonState()
-        local saveButton = tj.frames.saveButton
-        if tj.currentViewingEntry then
-            saveButton:Disable()
-        else
-            saveButton:Enable()
-        end
-    end
-
     -- main funcs
-    tj.currentViewingEntry = nil  -- to check for currently viewed in order to disable savebtn
 
     function tj.GetEntries(dateStr)
         local db = TurtleJournal_DB
@@ -335,7 +325,7 @@ tj:RegisterModule("functions", function()
         return db[dateStr]
     end
 
-    function tj.SelectEntry(dateStr, entryId)
+    function tj.GetEntryContent(dateStr, entryId)
         if not entryId then
             d:debug("Error: Missing parameters")
             return nil
@@ -344,14 +334,18 @@ tj:RegisterModule("functions", function()
         dateStr = dateStr or date("%Y-%m-%d")
         local entries = tj.GetEntries(dateStr)
         if entries and entries[entryId] then
-            tj.currentViewingEntry = {dateStr = dateStr, entryId = entryId}
             return entries[entryId]
         end
-        tj.currentViewingEntry = nil
         return nil
     end
 
     function tj.SaveEntry(makeNew)
+    
+        if not makeNew and not tj.selectedEntry then
+            d:print("No entry selected, cannot save")
+            return false
+        end
+    
         -- get content from editboxes
         local content = tj.frames.editBox:GetText()
         local title = tj.frames.titleEditBox:GetText()
@@ -392,7 +386,7 @@ tj:RegisterModule("functions", function()
                 d:debug("Created new date entry: " .. dateStr)
             end
         else
-            dateStr = tj.currentViewingEntry.dateStr
+            dateStr = tj.selectedEntry.dateStr
         end
 
         local noteIdx = nil
@@ -407,7 +401,7 @@ tj:RegisterModule("functions", function()
             end
             noteIdx = maxIdx + 1;
         else
-            noteIdx = tj.currentViewingEntry.entryId
+            noteIdx = tj.selectedEntry.id
         end
         
         -- create entry structure (removed timestamp for now)
@@ -448,7 +442,7 @@ tj:RegisterModule("functions", function()
         d:debug("Added entry #" .. noteIdx .. " on " .. dateStr)
         
         if makeNew then
-            tj.currentViewingEntry = {dateStr = dateStr, entryId = noteIdx}
+            tj.selectedEntry = {dateStr = dateStr, id = tostring(noteIdx)}
         end
 
         return true
@@ -483,7 +477,6 @@ tj:RegisterModule("functions", function()
             local function removeEntry()
                 db[dateStr][entryId] = nil
                 d:print("Entry ".. d.colors.green .."deleted|r.")
-                tj.currentViewingEntry = nil
                 tj.frames.saveButton:Disable()
                 -- cleanup empty tables
                 if next(db[dateStr]) == nil then
