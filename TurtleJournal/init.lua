@@ -130,11 +130,7 @@ SLASH_TURTLEJOURNAL1 = "/tj"
 SLASH_TURTLEJOURNAL2 = "/turtlejournal"
 function SlashCmdList.TURTLEJOURNAL()
     if tj.frames.main:IsVisible() then
-        tj.frames.main:Hide()
-        tj.frames.bottomOptionFrame2:Hide()
-        d:debug("TurtleJournal closed")
-        tj.DoEmote("STAND")
-        tj.SwooshSound()
+        tj.CloseJournal()
     else
         tj.frames.main:Show()
         if TurtleJournal_Settings.autoOpen then
