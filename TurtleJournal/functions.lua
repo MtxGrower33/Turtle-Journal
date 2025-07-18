@@ -18,6 +18,7 @@ tj:RegisterModule("functions", function()
         limit = true,
         sit = true,
         centerText = true,
+        autoSave = false,
         scale = 1,
         alpha = 1.0,
     }
@@ -55,6 +56,17 @@ tj:RegisterModule("functions", function()
             tj.frames.miniScrollPanel:Show()
             d:debug("Opened journal")
         end
+    end
+    
+    function tj.CloseJournal()
+        tj.frames.main:Hide()
+        tj.frames.bottomOptionFrame2:Hide()
+        tj.DoEmote("STAND")
+        tj.SwooshSound()
+        if TurtleJournal_Settings.autoSave and tj.selectedEntry then
+            tj.SaveEntry(false)
+        end
+        d:debug("TurtleJournal closed")
     end
 
     function tj.SetName()
