@@ -452,8 +452,6 @@ tj:RegisterModule("functions", function()
         if makeNew then
             tj.selectedEntry = {dateStr = dateStr, id = tostring(noteIdx)}
             d:print("Entry ".. d.colors.green .."created|r.")
-        else
-            d:print("Entry ".. d.colors.green .."saved|r.")
         end
 
         return true
