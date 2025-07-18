@@ -432,10 +432,6 @@ tj:RegisterModule("functions", function()
             return false
         end
 
-        -- hurray
-        tj.frames.leftScrollFrame:SetVerticalScroll(0)
-        d:print("Entry ".. d.colors.green .."saved|r.")
-
         -- refresh the entry list
         tj.UpdateEntryList()
 
@@ -443,6 +439,9 @@ tj:RegisterModule("functions", function()
         
         if makeNew then
             tj.selectedEntry = {dateStr = dateStr, id = tostring(noteIdx)}
+            d:print("Entry ".. d.colors.green .."created|r.")
+        else
+            d:print("Entry ".. d.colors.green .."saved|r.")
         end
 
         return true
@@ -503,9 +502,7 @@ tj:RegisterModule("functions", function()
             end
 
             -- refresh the entry list
-            tj.UpdateEntryList(dateStr)
-            tj.frames.editBox:SetText("")
-            tj.frames.titleEditBox:SetText("")
+            tj.UpdateEntryList()
 
             -- hide the entire popup after successful deletion
             StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")
