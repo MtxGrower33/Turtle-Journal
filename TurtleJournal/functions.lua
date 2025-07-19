@@ -18,6 +18,7 @@ tj:RegisterModule("functions", function()
         limit = true,
         sit = true,
         centerText = true,
+        autoSave = false,
         scale = 1,
         alpha = 1.0,
     }
@@ -55,6 +56,17 @@ tj:RegisterModule("functions", function()
             tj.frames.miniScrollPanel:Show()
             d:debug("Opened journal")
         end
+    end
+    
+    function tj.CloseJournal()
+        tj.frames.main:Hide()
+        tj.frames.bottomOptionFrame2:Hide()
+        tj.DoEmote("STAND")
+        tj.SwooshSound()
+        if TurtleJournal_Settings.autoSave and tj.selectedEntry then
+            tj.SaveEntry(false)
+        end
+        d:debug("TurtleJournal closed")
     end
 
     function tj.SetName()
@@ -311,17 +323,7 @@ tj:RegisterModule("functions", function()
         end)
     end
 
-    function tj.UpdateSaveButtonState()
-        local saveButton = tj.frames.saveButton
-        if tj.currentViewingEntry then
-            saveButton:Disable()
-        else
-            saveButton:Enable()
-        end
-    end
-
     -- main funcs
-    tj.currentViewingEntry = nil  -- to check for currently viewed in order to disable savebtn
 
     function tj.GetEntries(dateStr)
         local db = TurtleJournal_DB
@@ -335,7 +337,7 @@ tj:RegisterModule("functions", function()
         return db[dateStr]
     end
 
-    function tj.SelectEntry(dateStr, entryId)
+    function tj.GetEntryContent(dateStr, entryId)
         if not entryId then
             d:debug("Error: Missing parameters")
             return nil
@@ -344,14 +346,18 @@ tj:RegisterModule("functions", function()
         dateStr = dateStr or date("%Y-%m-%d")
         local entries = tj.GetEntries(dateStr)
         if entries and entries[entryId] then
-            tj.currentViewingEntry = {dateStr = dateStr, entryId = entryId}
             return entries[entryId]
         end
-        tj.currentViewingEntry = nil
         return nil
     end
 
     function tj.SaveEntry(makeNew)
+    
+        if not makeNew and not tj.selectedEntry then
+            d:print("No entry selected, cannot save")
+            return false
+        end
+    
         -- get content from editboxes
         local content = tj.frames.editBox:GetText()
         local title = tj.frames.titleEditBox:GetText()
@@ -392,7 +398,7 @@ tj:RegisterModule("functions", function()
                 d:debug("Created new date entry: " .. dateStr)
             end
         else
-            dateStr = tj.currentViewingEntry.dateStr
+            dateStr = tj.selectedEntry.dateStr
         end
 
         local noteIdx = nil
@@ -407,7 +413,7 @@ tj:RegisterModule("functions", function()
             end
             noteIdx = maxIdx + 1;
         else
-            noteIdx = tj.currentViewingEntry.entryId
+            noteIdx = tj.selectedEntry.id
         end
         
         -- create entry structure (removed timestamp for now)
@@ -438,17 +444,14 @@ tj:RegisterModule("functions", function()
             return false
         end
 
-        -- hurray
-        tj.frames.leftScrollFrame:SetVerticalScroll(0)
-        d:print("Entry ".. d.colors.green .."saved|r.")
-
         -- refresh the entry list
         tj.UpdateEntryList()
 
         d:debug("Added entry #" .. noteIdx .. " on " .. dateStr)
         
         if makeNew then
-            tj.currentViewingEntry = {dateStr = dateStr, entryId = noteIdx}
+            tj.selectedEntry = {dateStr = dateStr, id = tostring(noteIdx)}
+            d:print("Entry ".. d.colors.green .."created|r.")
         end
 
         return true
@@ -483,7 +486,6 @@ tj:RegisterModule("functions", function()
             local function removeEntry()
                 db[dateStr][entryId] = nil
                 d:print("Entry ".. d.colors.green .."deleted|r.")
-                tj.currentViewingEntry = nil
                 tj.frames.saveButton:Disable()
                 -- cleanup empty tables
                 if next(db[dateStr]) == nil then
@@ -510,9 +512,7 @@ tj:RegisterModule("functions", function()
             end
 
             -- refresh the entry list
-            tj.UpdateEntryList(dateStr)
-            tj.frames.editBox:SetText("")
-            tj.frames.titleEditBox:SetText("")
+            tj.UpdateEntryList()
 
             -- hide the entire popup after successful deletion
             StaticPopup_Hide("TURTLEJOURNAL_DELETE_CONFIRM")

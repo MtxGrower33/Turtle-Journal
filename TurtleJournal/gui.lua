@@ -67,7 +67,7 @@ tj:RegisterModule("gui", function ()
         editBox:SetAutoFocus(false)
         editBox:EnableMouse(true)
         editBox:SetText("")
-        editBox:SetFont("Fonts\\FRIZQT__.TTF", 15, "")
+        editBox:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
         if TurtleJournal_Settings.centerText then
             editBox:SetJustifyH("CENTER")
         else
@@ -246,10 +246,16 @@ tj:RegisterModule("gui", function ()
                 end
             end
 
-            -- if no entries, we're done
+            -- No entries exist, not even the auto-generated default one
             if not next(allEntries) then
                 tj.frames.sideEntryList.buttons = {}
                 leftScrollChild:SetHeight(leftScrollFrame:GetHeight())
+                
+                -- make a new blank one so we never get a state where the page is empty as behavior then is unintuitive
+                editBox:SetText("")
+                titleEditBox:SetText("Title")
+                titleEditBox:SetFocus()
+                tj.SaveEntry(true)
                 return
             end
 
@@ -272,6 +278,7 @@ tj:RegisterModule("gui", function ()
 
             local buttonHeight = 25
             local offset = 15
+            local firstEntry = true
 
             -- create buttons using sorted entries
             for _, sortedEntry in ipairs(sortedEntries) do
@@ -309,6 +316,9 @@ tj:RegisterModule("gui", function ()
                     editBox:ClearFocus()
                     titleEditBox:ClearFocus()
                     
+                    if TurtleJournal_Settings.autoSave and tj.selectedEntry then
+                        tj.SaveEntry(false)
+                    end
                     if tj.selectedButton then
                         tj.selectedButton:UnlockHighlight()
                     end
@@ -325,11 +335,21 @@ tj:RegisterModule("gui", function ()
 
                 tj.frames.sideEntryList.buttons[compoundId] = button
                 offset = offset + buttonHeight + 2
+                
+                if firstEntry and not tj.selectedEntry then
+                    leftScrollFrame:SetVerticalScroll(0)
+                    tj.selectedEntry = button.entryData
+                    tj.selectedButton = button
+                    button:LockHighlight()
+                    tj.DisplayEntry(button.entryData.dateStr, button.entryData.id)
+                end
+                
+                firstEntry = false
             end
         end
 
         function tj.DisplayEntry(dateStr, entryId)
-            local entry = tj.SelectEntry(dateStr, entryId)
+            local entry = tj.GetEntryContent(dateStr, entryId)
             if not entry then return end
 
             tj.frames.editBox:SetText(entry.content)
@@ -354,7 +374,7 @@ tj:RegisterModule("gui", function ()
         -- OPTIONS PANEL
         --==================================================
         local bottomOptionFrame = CreateFrame("Frame", "MyBottomOptionFrame", mainFrame)
-        bottomOptionFrame:SetWidth(300)
+        bottomOptionFrame:SetWidth(340)
         bottomOptionFrame:SetHeight(55)
         bottomOptionFrame:SetPoint("TOP", mainFrame, "BOTTOM", 0, 5)
         bottomOptionFrame:SetFrameStrata("HIGH")
@@ -449,11 +469,7 @@ tj:RegisterModule("gui", function ()
         local closeButton = CreateFrame("Button", nil, mainFrame, "UIPanelCloseButton")
         closeButton:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -13, -13)
         closeButton:SetScript("OnClick", function()
-            mainFrame:Hide()
-            tj.frames.bottomOptionFrame2:Hide()
-            tj.SwooshSound()
-            tj.DoEmote("STAND")
-            d:debug("closebtn clicked")
+            tj.CloseJournal()
         end)
         closeButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -466,29 +482,31 @@ tj:RegisterModule("gui", function ()
 
         local newButton = CreateFrame("Button", nil, bottomOptionFrame, "UIPanelButtonTemplate")
         newButton:SetWidth(59)
-        newButton:SetHeight(15)
+        newButton:SetHeight(20)
         newButton:SetPoint("TOPLEFT", bottomOptionFrame, "TOPLEFT", 25, -20)
         newButton:SetText("New")
         newButton:SetScript("OnClick", function()
+            if TurtleJournal_Settings.autoSave and tj.selectedEntry then
+                tj.SaveEntry(false)
+            end
             if TurtleJournal_Settings.autoOpen then
                 miniScrollPanel:Show()
                 sideEntryList:Show()
             end
             editBox:SetText("")
-            tj.currentViewingEntry = nil
             ScrollToTop()
             titleEditBox:SetText("Title")
             titleEditBox:SetFocus()
-            tj.SaveEntry(true)
             tj.selectedEntry = nil
             if tj.selectedButton then
                 tj.selectedButton:UnlockHighlight()
                 tj.selectedButton = nil
             end
+            tj.SaveEntry(true)
         end)
         newButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Clear entry")
+            GameTooltip:SetText("Create a new blank entry")
             GameTooltip:Show()
         end)
         newButton:SetScript("OnLeave", function()
@@ -497,7 +515,7 @@ tj:RegisterModule("gui", function ()
 
         local saveButton = CreateFrame("Button", nil, bottomOptionFrame, "UIPanelButtonTemplate")
         saveButton:SetWidth(59)
-        saveButton:SetHeight(15)
+        saveButton:SetHeight(20)
         saveButton:SetPoint("LEFT", newButton, "RIGHT", 5, 0)
         saveButton:SetText("Save")
         saveButton:SetScript("OnClick", function()
@@ -506,7 +524,7 @@ tj:RegisterModule("gui", function ()
         end)
         saveButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Save current entry")
+            GameTooltip:SetText("Save current entry to temporary storage. Will be written to permanent storage on game exit or when pressing Write to Disk")
             GameTooltip:Show()
         end)
         saveButton:SetScript("OnLeave", function()
@@ -515,7 +533,7 @@ tj:RegisterModule("gui", function ()
 
         local deleteButton = CreateFrame("Button", nil, bottomOptionFrame, "UIPanelButtonTemplate")
         deleteButton:SetWidth(59)
-        deleteButton:SetHeight(15)
+        deleteButton:SetHeight(20)
         deleteButton:SetPoint("LEFT", saveButton, "RIGHT", 5, 0)
         deleteButton:SetText("Delete")
         deleteButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
@@ -538,16 +556,19 @@ tj:RegisterModule("gui", function ()
         end)
 
         local saveDbButton = CreateFrame("Button", nil, bottomOptionFrame, "UIPanelButtonTemplate")
-        saveDbButton:SetWidth(59)
-        saveDbButton:SetHeight(15)
+        saveDbButton:SetWidth(99)
+        saveDbButton:SetHeight(20)
         saveDbButton:SetPoint("LEFT", deleteButton, "RIGHT", 5, 0)
-        saveDbButton:SetText("Save DB")
+        saveDbButton:SetText("Write to Disk")
         saveDbButton:SetScript("OnClick", function()
+            if tj.selectedEntry then
+                tj.SaveEntry(false)
+            end
             ReloadUI()
         end)
         saveDbButton:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Save database and reload UI")
+            GameTooltip:SetText("Saves all changes permanently (by reloading the UI). This is done automatically on game exit\nbut you can lose changes if the game crashes and you haven't pressed this.")
             GameTooltip:Show()
         end)
         saveDbButton:SetScript("OnLeave", function()
@@ -610,6 +631,25 @@ tj:RegisterModule("gui", function ()
             GameTooltip:Show()
         end)
         focusCheckbox:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        
+        local autoSaveCheckbox = CreateFrame("CheckButton", "TJAutoSaveCheckbox", bottomOptionFrame2, "UICheckButtonTemplate")
+        autoSaveCheckbox:SetPoint("TOP", focusCheckbox, "BOTTOM", 0, 0)
+        autoSaveCheckbox:SetWidth(20)
+        autoSaveCheckbox:SetHeight(20)
+        getglobal(autoSaveCheckbox:GetName().."Text"):SetText("Auto-Save")
+        autoSaveCheckbox:SetChecked(TurtleJournal_Settings.autoSave)
+        autoSaveCheckbox:SetScript("OnClick", function()
+            TurtleJournal_Settings.autoSave = (this:GetChecked() == 1)
+            d:debug("Auto-save setting changed to: "..tostring(TurtleJournal_Settings.autoSave))
+        end)
+        autoSaveCheckbox:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Save automatically when closing the journal or switching entries")
+            GameTooltip:Show()
+        end)
+        autoSaveCheckbox:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
 
